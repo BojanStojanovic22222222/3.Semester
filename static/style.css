@@ -1,0 +1,99 @@
+:root {
+    --bg-dark: #0c0f14;
+    --glass: rgba(255,255,255,0.05);
+    --border: rgba(255,255,255,0.12);
+    --text: #eef3fb;
+    --accent: #4aa8ff;
+    --yellow: #f1c40f;
+    --red: #ff4f4f;
+    --green: #2ecc71;
+}
+
+body {
+    background: linear-gradient(145deg, #0c0f14, #111827);
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+}
+
+header {
+    padding: 25px 35px;
+    font-size: 1.9rem;
+    font-weight: 700;
+    background: rgba(255,255,255,0.03);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+}
+
+.container {
+    width: 92%;
+    max-width: 1300px;
+    margin: 35px auto;
+}
+
+.grid-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px,1fr));
+    gap: 25px;
+}
+
+.card {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    padding: 25px;
+    border-radius: 18px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 25px rgba(0,0,0,0.35);
+}
+
+.value {
+    margin-top: 10px;
+    font-size: 2.7rem;
+    font-weight: 700;
+}
+
+/* Statuskort */
+.status-card h2 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.status-text {
+    margin-top: 10px;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.status-text.normal {
+    color: #2ecc71;
+}
+
+.status-text.advarsel {
+    color: #f1c40f;
+    text-shadow: 0 0 8px rgba(241, 196, 15, 0.5);
+}
+
+.status-text.kritisk {
+    color: #ff4f4f;
+    text-shadow: 0 0 12px rgba(255, 79, 79, 0.7);
+}
+
+
+#issuesList {
+    margin-top: 10px;
+    padding-left: 15px;
+}
+.graph-controls {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+select {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    padding: 8px 15px;
+    color: var(--text);
+    border-radius: 10px;
+}
