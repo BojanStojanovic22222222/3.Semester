@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <title>Glostrup Hospital</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+   
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<header>IoMT – Avanceret Patientovervågning</header>
+
+<div class="container">
+
+    
+    <div class="status-card card">
+        <h2>Patientstatus</h2>
+        <div id="statusText" class="status-text">Indlæser...</div>
+        <ul id="issuesList"></ul>
+    </div>
+
+    
+    <div class="grid-3">
+        <div class="card">
+            <span class="label">Puls (BPM)</span>
+            <div id="bpm" class="value">--</div>
+        </div>
+
+        <div class="card">
+            <span class="label">SpO₂ (%)</span>
+            <div id="spo2" class="value">--</div>
+        </div>
+
+        <div class="card">
+            <span class="label">Temperatur (°C)</span>
+            <div id="temp" class="value">--</div>
+        </div>
+    </div>
+
+    <!-- GRAF -->
+    <div class="card" style="margin-top:35px;">
+        <div class="graph-controls">
+            <label>Graf-type:</label>
+            <select id="chartTypeSelector">
+                <option value="line">Linjegraf</option>
+                <option value="bar">Søjlediagram</option>
+            </select>
+
+            <label style="margin-left:20px;">Periode:</label>
+            <select id="timeSelector">
+                <option value="10">Sidste 10 min</option>
+                <option value="30">Sidste 30 min</option>
+                <option value="60">Sidste 1 time</option>
+                <option value="0">Alle</option>
+            </select>
+        </div>
+
+        <canvas id="chart"></canvas>
+    </div>
+
+</div>
+
+<script>
+let chart;
+let lastRenderedData = null;
+
+document.getElementById("chartTypeSelector").addEventListener("change", () => {
+    if (lastRenderedData) renderChart(lastRenderedData);
+});
+
+document.getElementById("timeSelector").addEventListener("change", loadData);
+
+async function loadData() {
+    const minutes = document.getElementById("timeSelector").value;
+    const res = await fetch(`/api/history?minutes=${minutes === "0" ? "" : minutes}`);
+    const data = await res.json();
+
+    if (!data.length) return;
+
+    lastRenderedData = data;
+
+    const last = data[data.length - 1];
+    document.getElementById("bpm").textContent = last.bpm;
+    document.getElementById("spo2").textContent = last.spo2;
+    document.getElementById("temp").textContent = last.temperature.toFixed(1);
+
+    updateStatus();
+
+    renderChart(data);
+}
+
+async function updateStatus() {
+    const res = await fetch("/api/stats");
+    const stats = await res.json();
+
+    const statusEl = document.getElementById("statusText");
+    const issuesEl = document.getElementById("issuesList");
+
+    statusEl.textContent = stats.status;
+
+    issuesEl.innerHTML = "";
+    stats.issues.forEach(i => {
+        const li = document.createElement("li");
+        li.textContent = "• " + i;
+        issuesEl.appendChild(li);
+    });
+
+    
+ 
+const className = stats.status.toLowerCase(); 
+statusEl.className = "status-text " + className;
+
+document.querySelector(".status-card").className = "status-card card " + className;
+
+
+}
+
+function renderChart(data) {
+    const ctx = document.getElementById("chart");
+    const typeSel = document.getElementById("chartTypeSelector").value;
+
+    const labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
+    const bpm = data.map(d => d.bpm);
+    const spo2 = data.map(d => d.spo2);
+    const temp = data.map(d => d.temperature);
+
+    if (chart) chart.destroy();
+
+    const gradient = ctx.getContext("2d").createLinearGradient(0,0,0,450);
+    gradient.addColorStop(0, "rgba(74,168,255,0.4)");
+    gradient.addColorStop(1, "rgba(74,168,255,0)");
+
+    chart = new Chart(ctx, {
+        type: typeSel,
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "BPM",
+                    data: bpm,
+                    borderColor: "#4aa8ff",
+                    backgroundColor: typeSel === "line" ? gradient : "#4aa8ff66",
+                    borderWidth: 3,
+                    fill: typeSel === "line",
+                    tension: 0.35
+                },
+                {
+                    label: "SpO₂",
+                    data: spo2,
+                    borderColor: "#f1c40f",
+                    backgroundColor: "#f1c40f66",
+                    borderWidth: 3,
+                    tension: 0.35
+                },
+                {
+                    label: "Temperatur",
+                    data: temp,
+                    borderColor: "#ff4f4f",
+                    backgroundColor: "#ff4f4f66",
+                    borderWidth: 3,
+                    tension: 0.35
+                }
+            ]
+        },
+        options: {
+            plugins: { legend: { labels: { color: "#fff" } } },
+            scales: {
+                x: { ticks: { color: "#ccc" } },
+                y: { ticks: { color: "#ccc" } }
+            }
+        }
+    });
+}
+
+setInterval(loadData, 2000);
+loadData();
+</script>
+
+</body>
+</html>
