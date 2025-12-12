@@ -5,9 +5,8 @@ import urequests
 from max30100 import MAX30100
 import neopixel
 
-
 SERVER_URL = "http://192.168.0.12:5000/api/data"
-
+API_TOKEN = "Glostrup"
 
 dht_sensor = dht.DHT11(Pin(4))
 
@@ -18,12 +17,8 @@ def read_temperature():
     except:
         return None
 
-
 i2c = I2C(0, scl=Pin(22), sda=Pin(21))
 sensor = MAX30100(i2c)
-
-print("Pulsoximeter klient startet")
-
 
 NUM_PIXELS = 12
 np = neopixel.NeoPixel(Pin(15), NUM_PIXELS)
@@ -32,7 +27,6 @@ def ring_color(r, g, b):
     for i in range(NUM_PIXELS):
         np[i] = (r, g, b)
     np.write()
-
 
 servo = PWM(Pin(18), freq=50)
 
@@ -51,7 +45,6 @@ def servo_alarm():
     time.sleep_ms(120)
     servo_set_angle(90)
 
-
 ENA = PWM(Pin(23), freq=2000)
 IN2 = Pin(19, Pin.OUT)
 
@@ -59,17 +52,13 @@ def vib_pulse(duration=200):
     ENA.duty(800)
     IN2.value(0)
     time.sleep_ms(duration)
-
     ENA.duty(0)
     time.sleep_ms(80)
-
     IN2.value(1)
     ENA.duty(800)
     time.sleep_ms(duration)
-
     ENA.duty(0)
     IN2.value(0)
-
 
 def sanitize_values(bpm, spo2, temp):
     if bpm is None or bpm <= 30 or bpm > 250:
@@ -80,7 +69,6 @@ def sanitize_values(bpm, spo2, temp):
         temp = 36.5
     return int(bpm), int(spo2), float(temp)
 
-
 def send_data(bpm, spo2, temp):
     bpm, spo2, temp = sanitize_values(bpm, spo2, temp)
     payload = {
@@ -90,57 +78,42 @@ def send_data(bpm, spo2, temp):
         "temperature": temp,
         "timestamp": time.time()
     }
-
+    headers = {"Authorization": "Bearer " + API_TOKEN}
     try:
-        print("Sender til server:", payload)
-        r = urequests.post(SERVER_URL, json=payload)
-        print("Status:", r.status_code)
+        r = urequests.post(SERVER_URL, json=payload, headers=headers)
         r.close()
-    except Exception as e:
-        print("Fejl ved POST:", e)
-
+    except:
+        pass
 
 def handle_temperature(temp):
-
-    print("Temperatur målt:", temp)
-
     if temp is None:
-        ring_color(40, 40, 0)   
+        ring_color(40, 40, 0)
         return
-
-    
     if temp < 25:
-        ring_color(0, 0, 80)    
+        ring_color(0, 0, 80)
     elif 25 <= temp <= 31:
-        ring_color(0, 80, 0)    
+        ring_color(0, 80, 0)
     else:
-        ring_color(80, 0, 0)    
-        print("Kritisk temperatur – alarm aktiveret")
+        ring_color(80, 0, 0)
         vib_pulse(300)
         servo_alarm()
-
 
 def smooth(values, window=8):
     if len(values) < window:
         return sum(values) / len(values)
     return sum(values[-window:]) / window
 
-
 ir_buffer = []
 red_buffer = []
-
 last_peak_time = time.ticks_ms()
 bpm = 0
 spo2 = 0
-
-print("Måling startet")
 
 while True:
     try:
         ir, red = sensor.read_raw()
 
         if ir < 8000:
-            print("Sæt finger på sensoren")
             ring_color(0, 0, 40)
             time.sleep(0.3)
             continue
@@ -161,7 +134,6 @@ while True:
 
             if interval > 400:
                 bpm_candidate = 60000 / interval
-
                 if 50 < bpm_candidate < 150:
                     bpm = int(bpm_candidate)
                 else:
@@ -175,7 +147,6 @@ while True:
                 if ir_dc > 0 and red_dc > 0:
                     R = (red_ac/red_dc) / (ir_ac/ir_dc)
                     spo2_calc = int(110 - 25 * R)
-
                     if 80 <= spo2_calc <= 100:
                         spo2 = spo2_calc
                     else:
@@ -187,17 +158,13 @@ while True:
                 else:
                     temp = temp_raw
 
-                print("BPM:", bpm, "SpO2:", spo2, "Temp:", temp)
-
                 handle_temperature(temp)
                 send_data(bpm, spo2, temp)
-
                 last_peak_time = now
 
         time.sleep(0.02)
 
-    except Exception as e:
-        print("Fejl:", e)
+    except:
         ring_color(80, 0, 0)
         time.sleep(0.5)
 
