@@ -6,7 +6,7 @@ from max30100 import MAX30100
 import neopixel
 
 
-SERVER_URL = "http://192.168.0.11:5000/api/data"
+SERVER_URL = "http://192.168.0.12:5000/api/data"
 
 
 dht_sensor = dht.DHT11(Pin(4))
@@ -19,12 +19,10 @@ def read_temperature():
         return None
 
 
-
 i2c = I2C(0, scl=Pin(22), sda=Pin(21))
 sensor = MAX30100(i2c)
 
 print("Pulsoximeter klient startet")
-
 
 
 NUM_PIXELS = 12
@@ -34,7 +32,6 @@ def ring_color(r, g, b):
     for i in range(NUM_PIXELS):
         np[i] = (r, g, b)
     np.write()
-
 
 
 servo = PWM(Pin(18), freq=50)
@@ -55,46 +52,37 @@ def servo_alarm():
     servo_set_angle(90)
 
 
+ENA = PWM(Pin(23), freq=2000)
+IN2 = Pin(19, Pin.OUT)
 
-VIB_A = Pin(23, Pin.OUT)
-VIB_B = Pin(19, Pin.OUT)
+def vib_pulse(duration=200):
+    ENA.duty(800)
+    IN2.value(0)
+    time.sleep_ms(duration)
 
-def vib_on():
-    VIB_A.value(1)
-    VIB_B.value(0)
+    ENA.duty(0)
+    time.sleep_ms(80)
 
-def vib_off():
-    VIB_A.value(0)
-    VIB_B.value(0)
+    IN2.value(1)
+    ENA.duty(800)
+    time.sleep_ms(duration)
 
-def vib_pulse(ms=120):
-    vib_on()
-    time.sleep_ms(ms)
-    vib_off()
-
+    ENA.duty(0)
+    IN2.value(0)
 
 
 def sanitize_values(bpm, spo2, temp):
-
-  
     if bpm is None or bpm <= 30 or bpm > 250:
         bpm = 70
-
-   
     if spo2 is None or spo2 < 80 or spo2 > 100:
         spo2 = 97
-
-    
     if temp is None or temp < 20 or temp > 45:
         temp = 36.5
-
     return int(bpm), int(spo2), float(temp)
 
 
 def send_data(bpm, spo2, temp):
-
     bpm, spo2, temp = sanitize_values(bpm, spo2, temp)
-
     payload = {
         "patient_id": 1,
         "bpm": bpm,
@@ -113,17 +101,22 @@ def send_data(bpm, spo2, temp):
 
 
 def handle_temperature(temp):
+
+    print("Temperatur målt:", temp)
+
     if temp is None:
-        ring_color(40, 40, 0)
+        ring_color(40, 40, 0)   
         return
 
+    
     if temp < 25:
-        ring_color(0, 0, 80)
-    elif 25 <= temp <= 32:
-        ring_color(0, 80, 0)
+        ring_color(0, 0, 80)    
+    elif 25 <= temp <= 31:
+        ring_color(0, 80, 0)    
     else:
-        ring_color(80, 0, 0)
-        vib_pulse()
+        ring_color(80, 0, 0)    
+        print("Kritisk temperatur – alarm aktiveret")
+        vib_pulse(300)
         servo_alarm()
 
 
@@ -207,3 +200,4 @@ while True:
         print("Fejl:", e)
         ring_color(80, 0, 0)
         time.sleep(0.5)
+
