@@ -3,12 +3,14 @@ import re
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
+API_TOKEN = os.getenv("API_TOKEN")
 
 app = Flask(__name__)
 
-
 number_pattern = re.compile(r"^\d+(\.\d+)?$")
-
 
 if os.getenv("TESTING") == "1":
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///test.db"
@@ -65,24 +67,29 @@ def evaluate_status(m):
 def index():
     return render_template("index.html")
 
+
 @app.route("/api/data", methods=["POST"])
 def receive_data():
-    data = request.get_json()
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return jsonify({"error": "Missing bearer token"}), 401
 
+    if auth.replace("Bearer ", "") != API_TOKEN:
+        return jsonify({"error": "Invalid token"}), 403
+
+    data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON"}), 400
 
-   
     if not number_pattern.match(str(data.get("bpm", ""))):
-        return jsonify({"error": "Invalid BPM format"}), 400
+        return jsonify({"error": "Invalid BPM"}), 400
 
     if not number_pattern.match(str(data.get("spo2", ""))):
-        return jsonify({"error": "Invalid SpO2 format"}), 400
+        return jsonify({"error": "Invalid SpO2"}), 400
 
     if not number_pattern.match(str(data.get("temperature", ""))):
-        return jsonify({"error": "Invalid temperature format"}), 400
+        return jsonify({"error": "Invalid temperature"}), 400
 
-  
     m = Measurement(
         patient_id=data.get("patient_id", 1),
         bpm=int(data["bpm"]),
@@ -96,6 +103,7 @@ def receive_data():
 
     return jsonify({"status": "OK"}), 200
 
+
 @app.route("/api/history")
 def history():
     limit = int(request.args.get("limit", 100))
@@ -107,30 +115,26 @@ def history():
         since = datetime.utcnow() - timedelta(minutes=int(minutes))
         query = query.filter(Measurement.timestamp >= since)
 
-    measurements = query.limit(limit).all()
-    measurements = list(reversed(measurements))
+    data = list(reversed(query.limit(limit).all()))
+    return jsonify([m.to_dict() for m in data])
 
-    return jsonify([m.to_dict() for m in measurements])
 
 @app.route("/api/stats")
 def stats():
     last = Measurement.query.order_by(Measurement.timestamp.desc()).first()
-
     if not last:
         return jsonify({"error": "no data"}), 404
 
-    last_10_min = Measurement.query.filter(
+    last_10 = Measurement.query.filter(
         Measurement.timestamp >= datetime.utcnow() - timedelta(minutes=10)
     ).all()
 
-    if last_10_min:
-        avg_bpm = sum(m.bpm for m in last_10_min) / len(last_10_min)
-        avg_spo2 = sum(m.spo2 for m in last_10_min) / len(last_10_min)
-        avg_temp = sum(m.temperature for m in last_10_min) / len(last_10_min)
+    if last_10:
+        avg_bpm = sum(m.bpm for m in last_10) / len(last_10)
+        avg_spo2 = sum(m.spo2 for m in last_10) / len(last_10)
+        avg_temp = sum(m.temperature for m in last_10) / len(last_10)
     else:
-        avg_bpm = 0
-        avg_spo2 = 0
-        avg_temp = 0
+        avg_bpm = avg_spo2 = avg_temp = 0
 
     status, issues = evaluate_status(last)
 

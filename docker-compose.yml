@@ -9,11 +9,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
-      
-      FLASK_ENV: production
-      
       DATABASE_URL: postgresql://iot_user:iot_password@db:5432/iot_db
+      FLASK_ENV: production
     restart: unless-stopped
 
   db:
